@@ -49,6 +49,7 @@ bool callPlannerInterfaceSolve(const planning_interface::PlannerManager* planner
                                const planning_interface::MotionPlanRequest& req,
                                planning_interface::MotionPlanResponse& res)
 {
+  ROS_INFO("SC: callPlannerInterfaceSolve");
   planning_interface::PlanningContextPtr context = planner->getPlanningContext(planning_scene, req, res.error_code_);
   if (context)
     return context->solve(res);
@@ -63,6 +64,7 @@ bool PlanningRequestAdapter::adaptAndPlan(const planning_interface::PlannerManag
                                           planning_interface::MotionPlanResponse& res,
                                           std::vector<std::size_t>& added_path_index) const
 {
+  ROS_INFO("SC: adaptAndPlan(planner, planning_scene, req, res, added_path_index)");
   return adaptAndPlan(boost::bind(&callPlannerInterfaceSolve, planner.get(), _1, _2, _3), planning_scene, req, res,
                       added_path_index);
 }
@@ -72,6 +74,7 @@ bool PlanningRequestAdapter::adaptAndPlan(const planning_interface::PlannerManag
                                           const planning_interface::MotionPlanRequest& req,
                                           planning_interface::MotionPlanResponse& res) const
 {
+  ROS_INFO("SC: adaptAndPlan(planner, planning_scene, req, res)");  
   std::vector<std::size_t> dummy;
   return adaptAndPlan(planner, planning_scene, req, res, dummy);
 }
@@ -85,6 +88,7 @@ bool callAdapter1(const PlanningRequestAdapter* adapter, const planning_interfac
                   const planning_interface::MotionPlanRequest& req, planning_interface::MotionPlanResponse& res,
                   std::vector<std::size_t>& added_path_index)
 {
+  ROS_INFO("SC: callAdapter1()");  
   try
   {
     return adapter->adaptAndPlan(planner, planning_scene, req, res, added_path_index);
@@ -103,6 +107,7 @@ bool callAdapter2(const PlanningRequestAdapter* adapter, const PlanningRequestAd
                   const planning_interface::MotionPlanRequest& req, planning_interface::MotionPlanResponse& res,
                   std::vector<std::size_t>& added_path_index)
 {
+  ROS_INFO("SC: callAdapter2()");  
   try
   {
     return adapter->adaptAndPlan(planner, planning_scene, req, res, added_path_index);
@@ -122,6 +127,7 @@ bool PlanningRequestAdapterChain::adaptAndPlan(const planning_interface::Planner
                                                const planning_interface::MotionPlanRequest& req,
                                                planning_interface::MotionPlanResponse& res) const
 {
+  ROS_INFO("SC: PlanningRequestAdapterChain::adaptAndPlan(planner, planning_scene,req, res)");
   std::vector<std::size_t> dummy;
   return adaptAndPlan(planner, planning_scene, req, res, dummy);
 }
@@ -132,14 +138,18 @@ bool PlanningRequestAdapterChain::adaptAndPlan(const planning_interface::Planner
                                                planning_interface::MotionPlanResponse& res,
                                                std::vector<std::size_t>& added_path_index) const
 {
+  ROS_INFO("SC: PlanningRequestAdapterChain::adaptAndPlan(planner, planning_scene,req, res, added_path_index) ");
   // if there are no adapters, run the planner directly
   if (adapters_.empty())
   {
+  ROS_INFO("SC: Adapters empty, calling callPlannerInterfaceSolve() ");
     added_path_index.clear();
     return callPlannerInterfaceSolve(planner.get(), planning_scene, req, res);
   }
   else
   {
+    ROS_INFO("SC: Adapters not empty");
+
     // the index values added by each adapter
     std::vector<std::vector<std::size_t> > added_path_index_each(adapters_.size());
 

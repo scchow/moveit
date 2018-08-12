@@ -200,6 +200,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
                                                        const planning_interface::MotionPlanRequest& req,
                                                        planning_interface::MotionPlanResponse& res) const
 {
+  ROS_INFO("SC: Generate Plan with dummy adapter added state index called");
   std::vector<std::size_t> dummy;
   return generatePlan(planning_scene, req, res, dummy);
 }
@@ -225,6 +226,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
   {
     if (adapter_chain_)
     {
+      ROS_INFO("SC: adaptAndPlan called");
       solved = adapter_chain_->adaptAndPlan(planner_instance_, planning_scene, req, res, adapter_added_state_index);
       if (!adapter_added_state_index.empty())
       {
@@ -236,6 +238,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
     }
     else
     {
+      ROS_INFO("SC: getPlanningContext called, then solve called");
       planning_interface::PlanningContextPtr context =
           planner_instance_->getPlanningContext(planning_scene, req, res.error_code_);
       solved = context ? context->solve(res) : false;
@@ -252,6 +255,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
   {
     std::size_t state_count = res.trajectory_->getWayPointCount();
     ROS_DEBUG_STREAM("Motion planner reported a solution path with " << state_count << " states");
+    ROS_INFO_STREAM("SC: Motion planner reported a solution path with " << state_count << " states");
     if (check_solution_paths_)
     {
       std::vector<std::size_t> index;
@@ -338,7 +342,7 @@ bool planning_pipeline::PlanningPipeline::generatePlan(const planning_scene::Pla
     robot_state::robotStateToRobotStateMsg(res.trajectory_->getFirstWayPoint(), disp.trajectory_start);
     display_path_publisher_.publish(disp);
   }
-
+  ROS_INFO("SC: GeneratePlan Completed");
   return solved && valid;
 }
 

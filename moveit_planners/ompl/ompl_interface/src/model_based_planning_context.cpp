@@ -533,7 +533,7 @@ void ompl_interface::ModelBasedPlanningContext::startSampling()
 }
 
 void ompl_interface::ModelBasedPlanningContext::stopSampling()
-{
+{  
   bool gls = ompl_simple_setup_->getGoal()->hasType(ob::GOAL_LAZY_SAMPLES);
   if (gls)
     static_cast<ob::GoalLazySamples*>(ompl_simple_setup_->getGoal().get())->stopSampling();
@@ -545,12 +545,14 @@ void ompl_interface::ModelBasedPlanningContext::stopSampling()
 void ompl_interface::ModelBasedPlanningContext::preSolve()
 {
   // clear previously computed solutions
+  ROS_INFO("SC: presolve called");
   ompl_simple_setup_->getProblemDefinition()->clearSolutionPaths();
   const ob::PlannerPtr planner = ompl_simple_setup_->getPlanner();
   if (planner)
     planner->clear();
   startSampling();
   ompl_simple_setup_->getSpaceInformation()->getMotionValidator()->resetMotionCounter();
+  ROS_INFO("SC: presolve ended");
 }
 
 void ompl_interface::ModelBasedPlanningContext::postSolve()
@@ -566,17 +568,29 @@ void ompl_interface::ModelBasedPlanningContext::postSolve()
 
 bool ompl_interface::ModelBasedPlanningContext::solve(planning_interface::MotionPlanResponse& res)
 {
+  ROS_INFO("SC: modelbasedplanningcontext solve called");
   if (solve(request_.allowed_planning_time, request_.num_planning_attempts))
   {
+    ROS_INFO_NAMED("SC: model_based_planning_context", "%s: Returning successful solution with %lu states before simplification before interpolation",
+                    getName().c_str(), getOMPLSimpleSetup()->getSolutionPath().getStateCount());
+
     double ptime = getLastPlanTime();
     if (simplify_solutions_)
     {
       simplifySolution(request_.allowed_planning_time - ptime);
       ptime += getLastSimplifyTime();
     }
+
+
+    ROS_INFO_NAMED("SC: model_based_planning_context", "%s: Returning successful solution with %lu states after simplication before interpolation",
+                    getName().c_str(), getOMPLSimpleSetup()->getSolutionPath().getStateCount());
+
     interpolateSolution();
 
     // fill the response
+
+    ROS_INFO_NAMED("SC: model_based_planning_context", "%s: Returning successful solution with %lu states after simplification after interpolation",
+                    getName().c_str(), getOMPLSimpleSetup()->getSolutionPath().getStateCount());
     ROS_DEBUG_NAMED("model_based_planning_context", "%s: Returning successful solution with %lu states",
                     getName().c_str(), getOMPLSimpleSetup()->getSolutionPath().getStateCount());
 
@@ -595,6 +609,8 @@ bool ompl_interface::ModelBasedPlanningContext::solve(planning_interface::Motion
 
 bool ompl_interface::ModelBasedPlanningContext::solve(planning_interface::MotionPlanDetailedResponse& res)
 {
+  ROS_INFO("SC: modelbasedplanningcontext Detailed response solve called");
+
   if (solve(request_.allowed_planning_time, request_.num_planning_attempts))
   {
     res.trajectory_.reserve(3);
@@ -641,6 +657,8 @@ bool ompl_interface::ModelBasedPlanningContext::solve(planning_interface::Motion
 
 bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned int count)
 {
+  ROS_INFO("SC: modelbasedplanningcontext solve(double, unsigned int) called");
+
   moveit::tools::Profiler::ScopedBlock sblock("PlanningContext:Solve");
   ompl::time::point start = ompl::time::now();
   preSolve();
@@ -649,10 +667,15 @@ bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned i
   if (count <= 1)
   {
     ROS_DEBUG_NAMED("model_based_planning_context", "%s: Solving the planning problem once...", name_.c_str());
+    ROS_INFO_NAMED("SC: count less than or equal to 1: model_based_planning_context", "%s: Solving the planning problem once...", name_.c_str());
+
     ob::PlannerTerminationCondition ptc =
         ob::timedPlannerTerminationCondition(timeout - ompl::time::seconds(ompl::time::now() - start));
     registerTerminationCondition(ptc);
+    ROS_INFO("SC: simple setup -> solve called");
     result = ompl_simple_setup_->solve(ptc) == ompl::base::PlannerStatus::EXACT_SOLUTION;
+    ROS_INFO("SC: simple setup -> solve returned");
+
     last_plan_time_ = ompl_simple_setup_->getLastPlanComputationTime();
     unregisterTerminationCondition();
   }
@@ -660,6 +683,9 @@ bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned i
   {
     ROS_DEBUG_NAMED("model_based_planning_context", "%s: Solving the planning problem %u times...", name_.c_str(),
                     count);
+    ROS_INFO_NAMED("SC: count greater than 1: model_based_planning_context", "%s: Solving the planning problem %u times...", name_.c_str(),
+                    count);
+
     ompl_parallel_plan_.clearHybridizationPaths();
     if (count <= max_planning_threads_)
     {
@@ -674,7 +700,9 @@ bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned i
       ob::PlannerTerminationCondition ptc =
           ob::timedPlannerTerminationCondition(timeout - ompl::time::seconds(ompl::time::now() - start));
       registerTerminationCondition(ptc);
+      ROS_INFO("SC: count LEQ max_planning_threads_: Parallel plan called");
       result = ompl_parallel_plan_.solve(ptc, 1, count, true) == ompl::base::PlannerStatus::EXACT_SOLUTION;
+      ROS_INFO("SC: count LEQ max_planning_threads_: Parallel plan returned");
       last_plan_time_ = ompl::time::seconds(ompl::time::now() - start);
       unregisterTerminationCondition();
     }
@@ -707,7 +735,13 @@ bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned i
         else
           for (int i = 0; i < n; ++i)
             ompl_parallel_plan_.addPlanner(ompl::tools::SelfConfig::getDefaultPlanner(ompl_simple_setup_->getGoal()));
+       
+        ROS_INFO("SC: count GT max_planning_threads_: Parallel plan called");
+
         bool r = ompl_parallel_plan_.solve(ptc, 1, count, true) == ompl::base::PlannerStatus::EXACT_SOLUTION;
+        
+        ROS_INFO("SC: count GT max_planning_threads_: Parallel plan returned");
+
         result = result && r;
       }
       last_plan_time_ = ompl::time::seconds(ompl::time::now() - start);
@@ -715,8 +749,9 @@ bool ompl_interface::ModelBasedPlanningContext::solve(double timeout, unsigned i
     }
   }
 
+  ROS_INFO("SC: Post solve called");
   postSolve();
-
+  ROS_INFO("SC: Post solve returned");
   return result;
 }
 
